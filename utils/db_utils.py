@@ -52,7 +52,6 @@ def load_data_from_bd(config: dict,
 
             except ResourceClosedError:
                 connection.commit()
-                connection.detach()
                 print(f'->Обновление таблицы - {schema}.{table_name} - успешно <-')
                 return True
 
@@ -82,7 +81,6 @@ def load_data_in_db(df: pd.DataFrame,
         with sql_processor.load_settings_connect() as connection:
             sql_processor.load_data_sql(df, name_table_in_db, exists, connection=connection, index=index, schema=schema)
             print(f'->Записи в таблице - {schema}.{name_table_in_db} созданы <-')
-            connection.detach()
 
     except Exception as e:
         logger.error(f'->Ошибка {e} при загрузке данных в таблицу - {schema}.{name_table_in_db} <-')
@@ -119,15 +117,16 @@ def update_solo_data_in_db(config: dict,
 
         sql_processor.create_extract_engine()
         with sql_processor.extract_settings_connect() as connection:
-            sql_processor.extract_data_sql(
-                update_query,
-                connection=connection,
-                params=params_values,
-            )
-            connection.commit()
-            connection.detach()
-            print(f'->Обновление в таблице - {schema}.{table_name} - успешна <-')
-            return True
+            try:
+                sql_processor.extract_data_sql(
+                    update_query,
+                    connection=connection,
+                    params=params_values,
+                )
+            except ResourceClosedError:
+                connection.commit()
+                print(f'->Обновление таблицы - {schema}.{table_name} - успешно <-')
+                return True
 
     except Exception as e:
         logger.error(f'->Ошибка {e} при загрузке данных в таблицу - {schema}.{table_name} <-')

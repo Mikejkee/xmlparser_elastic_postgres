@@ -57,29 +57,29 @@ def match_elastic_offer(file_path: str, batch_size: int = 10000):
     elastic_updater = SimilarProductsESUpdater('offer_index', ELASTIC_HOST, ELASTIC_PORT, ELASTIC_PASSWORD)
     elastic_updater.create_index()
 
-    categories_by_level = parse_categories(file_path)
-    category_map = {data['categoryId']: data for level_data in categories_by_level.values() for data in level_data}
-
-    batch_data = []
-    context = etree.iterparse(file_path, tag='offer', events=('end',))
-    for event, offer in context:
-        offer_data = process_offer(offer, category_map)
-        batch_data.append(offer_data)
-
-        if len(batch_data) >= batch_size:
-            elastic_updater.load_data_to_elasticsearch(batch_data)
-            batch_df_in_db(batch_data, config, DB_SCHEMA, DB_TABLE)
-            batch_data.clear()
-
-        offer.clear()
-        while offer.getprevious() is not None:
-            del offer.getparent()[0]
-
-    # Загружаем оставшиеся данные, если они есть
-    if batch_data:
-        elastic_updater.load_data_to_elasticsearch(batch_data)
-        batch_df_in_db(batch_data, config, DB_SCHEMA, DB_TABLE)
-        batch_data.clear()
+    # categories_by_level = parse_categories(file_path)
+    # category_map = {data['categoryId']: data for level_data in categories_by_level.values() for data in level_data}
+    #
+    # batch_data = []
+    # context = etree.iterparse(file_path, tag='offer', events=('end',))
+    # for event, offer in context:
+    #     offer_data = process_offer(offer, category_map)
+    #     batch_data.append(offer_data)
+    #
+    #     if len(batch_data) >= batch_size:
+    #         elastic_updater.load_data_to_elasticsearch(batch_data)
+    #         batch_df_in_db(batch_data, config, DB_SCHEMA, DB_TABLE)
+    #         batch_data.clear()
+    #
+    #     offer.clear()
+    #     while offer.getprevious() is not None:
+    #         del offer.getparent()[0]
+    #
+    # # Загружаем оставшиеся данные, если они есть
+    # if batch_data:
+    #     elastic_updater.load_data_to_elasticsearch(batch_data)
+    #     batch_df_in_db(batch_data, config, DB_SCHEMA, DB_TABLE)
+    #     batch_data.clear()
 
     base_dir_utils = os.path.join(base_dir, 'utils')
     load_data_from_bd_chunk_function(

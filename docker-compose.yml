@@ -39,6 +39,7 @@ services:
     image: postgres:16-alpine
     volumes:
       - ./initdb.sql:/docker-entrypoint-initdb.d/initdb.sql
+      - postgres_data:/var/lib/postgresql/data/
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -57,7 +58,6 @@ services:
       - es01
 #      - es02
       - kibana
-    command: sh -c "sleep 10 && python main.py"
     networks:
       - offer_parser_network
 
@@ -67,6 +67,8 @@ volumes:
   esdata02:
     driver: local
   kibanadata:
+    driver: local
+  postgres_data:
     driver: local
 
 networks:

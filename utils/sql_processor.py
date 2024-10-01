@@ -201,20 +201,6 @@ class SQLProcessor:
             current_connection = connection
         return pd.read_sql(sql_query, current_connection, params=params, chunksize=chunksize, parse_dates=parse_dates)
 
-    def get_check_list(self, check_field: str, table_name: str) -> List:
-        """ EXTRACT Метод выгружает список уже загруженных файлов в DataFrame
-            :param str check_field: столбец для проверки
-            :param str table_name: название таблицы
-        """
-        with self.extract_settings_connect() as connection:
-            self.sql_query('SET SCHEMA \'public\'', connection)
-            filename_df = self.extract_data_sql('SELECT ' + check_field + ' FROM "' + table_name + '"')
-            check_list = filename_df[check_field].to_list()
-
-            connection.detach()
-        connection.close()
-
-        return check_list
 
     def create_load_engine(self, **kwargs) -> object:
         """LOAD Метод создает engine для соединения с БД"""
