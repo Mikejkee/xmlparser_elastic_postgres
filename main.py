@@ -1,26 +1,32 @@
 import os
+from uuid import uuid4
 
+from dotenv import load_dotenv
 from lxml import etree
-from elasticsearch import Elasticsearch, helpers
+from elasticsearch import Elasticsearch
 
 from utils.db_utils import batch_df_in_db
+from utils.elastic_utils import create_index, load_data_to_elasticsearch
 
+load_dotenv('.env-test')
+ELASTIC_HOST = os.environ.get('ELASTIC_HOST')
+ELASTIC_PORT = os.environ.get('ES_PORT')
+ELASTIC_PASSWORD = os.environ.get('ELASTIC_PASSWORD')
 
-
+DB_TABLE = os.environ.get('DB_TABLE')
+DB_SCHEMA = os.environ.get('DB_SCHEMA')
 config = {
-    'psql_login': os.environ.get('SQL_USER'),
-    'psql_password': os.environ.get('SQL_PASSWORD'),
-    'psql_hostname': os.environ.get('SQL_HOST'),
-    'psql_port': os.environ.get('SQL_PORT'),
-    'psql_name_bd': os.environ.get('SQL_PARSER_DATABASE'),
+    'psql_login': os.environ.get('POSTGRES_USER'),
+    'psql_password': os.environ.get('POSTGRES_PASSWORD'),
+    'psql_hostname': os.environ.get('POSTGRES_HOST'),
+    'psql_port': os.environ.get('POSTGRES_PORT'),
+    'psql_name_bd': os.environ.get('POSTGRES_DB'),
     'psql_conn_type': 'postgres'
 }
-db_schema = os.environ.get('DB_SCHEMA')
-db_table = os.environ.get('DB_TABLE')
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
 
-def process_offer(offer):
+def process_offer(offer) -> dict:
     old_price = float(offer.findtext('oldprice', 0.0))
     new_price = float(offer.findtext('price', 0.0))
     discount = round((old_price - new_price) / old_price * 100, 2) if old_price != 0 else 0
@@ -28,6 +34,7 @@ def process_offer(offer):
     params = {param.get('name'): param.text for param in offer.findall('param')}
 
     offer_data = {
+        'uuid': uuid4(),
         'marketplace_id': int(offer.findtext('group_id', 0)),
         'product_id': int(offer.get('id', 0)),
         'title': offer.findtext('name'),
@@ -37,7 +44,6 @@ def process_offer(offer):
         'seller_name': offer.findtext('seller_name'),
         'first_image_url': offer.findtext('picture'),
         'category_id': int(offer.findtext('categoryId', 0)),
-        'features': params,
         'rating_count': int(offer.findtext('rating_count', 0)),
         'rating_value': float(offer.findtext('rating_value', 0.0)),
         'price_before_discounts': old_price,
@@ -53,55 +59,16 @@ def process_offer(offer):
     return offer_data
 
 
-def create_index(es, index_name):
-    """Создает индекс с заданным маппингом."""
-    mapping = {
-        "mappings": {
-            "properties": {
-                "uuid": {"type": "integer"},
-                "title": {"type": "text"},
-                "description": {"type": "text"},
-            }
-        }
-    }
-
-    # Проверяем, существует ли индекс, и создаем его, если нет
-    if not es.indices.exists(index=index_name):
-        es.indices.create(index=index_name, body=mapping)
-        print(f"Индекс '{index_name}' создан.")
-    else:
-        print(f"Индекс '{index_name}' уже существует.")
-
-
-def load_data_to_elasticsearch(dataframe, es_index, es_host='localhost', es_port=9200):
-    """Загружает данные из DataFrame в Elasticsearch."""
-    # TODO: разобраться с работой эластика и индексов, вставить данные в эластик, намутить нужный мэтч по заданию
-    #       Расфосовать функии по файликам, зарефакторить код (переменные, типы, оптимизация)
-    # Создаем клиент Elasticsearch
-    es = Elasticsearch([{'host': es_host, 'port': es_port}])
-
-    # Создаем индекс с маппингом
-    create_index(es, es_index)
-
-    # Подготовка данных для загрузки
-    actions = []
-    for _, row in dataframe.iterrows():
-        action = {
-            "_index": es_index,
-            "_id": row['product_id'],  # Используем уникальный идентификатор
-            "_source": row.to_dict()
-        }
-        actions.append(action)
-
-    # Используем Bulk API для загрузки данных
-    helpers.bulk(es, actions)
-    print(f"Данные успешно загружены в индекс '{es_index}'.")
-
-
-def match_elastic_offer(file_path: str, config, db_schema, db_table):
+def match_elastic_offer(file_path: str):
     """
     Обрабатывает XML файл чанками и загружает данные в БД.
     """
+    es = Elasticsearch(
+        [f"http://{ELASTIC_HOST}:{ELASTIC_PORT}"],
+        basic_auth=('elastic', ELASTIC_PASSWORD),
+    )
+    create_index(es, 'offer_index')
+
     context = etree.iterparse(file_path, tag='offer', events=('end',))
 
     batch_size = 1000
@@ -112,18 +79,17 @@ def match_elastic_offer(file_path: str, config, db_schema, db_table):
         batch_data.append(offer_data)
 
         if len(batch_data) >= batch_size:
-            batch_df_in_db(batch_data, config, db_schema, db_table)
+            batch_df_in_db(batch_data, config, DB_SCHEMA, DB_TABLE)
+            load_data_to_elasticsearch(batch_data, es, 'offer_index')
 
         offer.clear()
-        offer_parent = offer.getparent()
-
-        while offer_parent is not None:
-            offer_parent.remove(offer)
+        while offer.getprevious() is not None:
+            del offer.getparent()[0]
 
     # Загружаем оставшиеся данные, если они есть
     if batch_data:
-        batch_df_in_db(batch_data, config, db_schema, db_table)
-
+        batch_df_in_db(batch_data, config, DB_SCHEMA, DB_TABLE)
+        load_data_to_elasticsearch(batch_data, es, 'offer_index')
 
     return True
 

@@ -231,18 +231,17 @@ class SQLProcessor:
         self.load_settings_connection = self.load_settings_engine.connect()
         return self.load_settings_connection
 
-    def load_data_sql(self, dataframe: DataFrame, table: str, truncate: bool = False,
+    def load_data_sql(self, dataframe: DataFrame, table: str, if_exists: bool = False, index: bool = False,
                       connection: sa.engine.Connection = None, **kwargs) -> object:
         """ LOAD Метод осуществляет загрузку записей, хранящихся в DataFrame, в БД
+            :param if_exists:
+            :param index:
             :param DataFrame dataframe: датафрейм
             :param str table: название таблицы
             :param bool truncate: режим загрузки
             :param sa.engine.Connection connection: использует предложенное соединение,
             вместо self.load_settings_connection по умолчанию
         """
-        if_exists = 'append'
-        if truncate:
-            if_exists = 'replace'
         if not connection:
             connection = self.load_settings_connection
-        return dataframe.to_sql(table, connection, if_exists=if_exists, index=False, **kwargs)
+        return dataframe.to_sql(table, connection, if_exists=if_exists, index=index, **kwargs)

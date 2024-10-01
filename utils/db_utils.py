@@ -6,6 +6,7 @@ from sqlalchemy.exc import ResourceClosedError
 from sqlalchemy import text
 
 from .sql_processor import SQLProcessor
+from .additional_utils import post_processing_offer_df
 
 sql_processor = SQLProcessor()
 logger = logging.getLogger()
@@ -70,22 +71,16 @@ def load_data_in_db(df: pd.DataFrame,
     try:
         logger.info(f'->Вставляем записи в таблицу - {schema}.{name_table_in_db}  <-')
 
-        load_settings_url = (
+        sql_processor.load_settings_url = (
             f'{config["psql_conn_type"]}ql+psycopg2://'
             f'{config["psql_login"]}:{config["psql_password"]}'
             f'@{config["psql_hostname"]}:{config["psql_port"]}'
             f'/{config["psql_name_bd"]}'
         )
 
-        engine = sa.create_engine(load_settings_url)
-        with engine.connect() as connection:
-            df.to_sql(
-                name_table_in_db,
-                con=connection,
-                if_exists=exists,
-                index=index,
-                schema=schema
-            )
+        sql_processor.create_load_engine()
+        with sql_processor.load_settings_connect() as connection:
+            sql_processor.load_data_sql(df, name_table_in_db, exists, connection=connection, index=index, schema=schema)
             logger.info(f'->Записи в таблице - {schema}.{name_table_in_db} созданы <-')
             connection.detach()
 
@@ -139,7 +134,7 @@ def batch_df_in_db(batch_data: list,
                    name_table_in_db: str,
                    exists='append',
                    index=False) -> None:
-    df = pd.DataFrame(batch_data)
+    df = post_processing_offer_df(pd.DataFrame(batch_data))
     load_data_in_db(df, config, schema, name_table_in_db, exists, index)
     batch_data.clear()
 
