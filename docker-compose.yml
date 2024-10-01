@@ -18,23 +18,6 @@ services:
     networks:
       - offer_parser_network
 
-#  es02:
-#    depends_on:
-#      - es01
-#    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
-#    volumes:
-#      - esdata02:/usr/share/elasticsearch/data
-#    environment:
-#      - node.name=es02
-#      - cluster.name=${CLUSTER_NAME}
-#      - cluster.initial_master_nodes=es01,es02
-#      - discovery.seed_hosts=es01
-#      - bootstrap.memory_lock=true
-#      - xpack.security.enabled=false
-#      - xpack.license.self_generated.type=${LICENSE}
-#    networks:
-#      - offer_parser_network
-
   kibana:
     depends_on:
       - es01
@@ -46,7 +29,7 @@ services:
       - ${KIBANA_PORT}:5601
     environment:
       - SERVERNAME=kibana
-      - ELASTICSEARCH_HOSTS=https://es01:9200
+      - ELASTICSEARCH_HOSTS=http://es01:9200
       - ELASTICSEARCH_USERNAME=kibana_system
       - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
     networks:
@@ -74,6 +57,7 @@ services:
       - es01
 #      - es02
       - kibana
+    command: sh -c "sleep 10 && python main.py"
     networks:
       - offer_parser_network
 

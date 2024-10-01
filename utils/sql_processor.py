@@ -1,20 +1,15 @@
 import configparser
-import email
-import imaplib
 import io
 import locale
 import os
 import textwrap
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from email.header import decode_header
-from ftplib import FTP_TLS, FTP
 
 import pandas as pd
 import sqlalchemy as sa
 from pandas import DataFrame
 from pathlib import Path
-from typing import Any, List, Union
+from typing import Any, List
 
 
 @dataclass

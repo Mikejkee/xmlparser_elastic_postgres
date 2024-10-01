@@ -5,6 +5,3 @@ RUN pip install -r /requirements.txt
 
 WORKDIR /xmlparser_elastic_postgres
 COPY . .
-
-
-CMD ["python", "main.py"]
